@@ -1,0 +1,35 @@
+            done
+
+            if [ "$dir" = "/" -o -n "$partition" ]; then
+
+                break
+
+            else
+
+                dir=`dirname $dir`
+
+            fi
+
+        fi
+
+    done
+
+    [ "$partition" = "read-only" ] && echo "yes" || echo "no"
+
+###}
+
+
+
+# If resolv.conf on the readonly partition, we should override make_resolv_conf
+
+if [ `is_on_read_only_partition /etc/resolv.conf` = "no" ]; then
+
+    return
+
+fi
+
+
+
+#make_resolv_conf(){
+     #Dis
+#}
