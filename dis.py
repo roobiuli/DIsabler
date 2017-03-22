@@ -6,24 +6,34 @@ import argparse
 
 PAR = argparse.ArgumentParser(description="This script will activate / deactivate the \
                                                                   make_resolve_conf bash function which is \
-                                                                   used by the DHCP Client  and usually is used \
+                                                                   used by the DHCP Client / usually used \
                                                                     in DHClient hooks")
 
 PAR.add_argument("-A", dest="A", required=False, action='store_true', help="Having this switch enabled, it will Activate the function")
 PAR.add_argument("-D", dest="D", required=False, action='store_true', help="Having this switch enabled, it will Deactivate the function")
 PAR.add_argument("-f", dest="f", required=True, help="This switch is used to specify the DHClient hooks file location \
-                                                                                 ex: in Fedora based distros is located in /etc/")
+                                                                                 ex: in Fedora based distros is located in /etc/dhclient-enter-hooks")
 args = PAR.parse_args()
 
 FILE = args.f
-print FILE.strip()
-
 
 def bash(x):
     proc = Popen(x, shell=True, stdout=PIPE,  stderr=PIPE)
     out, err = proc.communicate()
     return out.strip(), err.strip(), proc.returncode
+def inserter():
+    """
+    Function that stands ready in case Values not found on
+    specific file, to insert it and continue
+    """
+    ins = ["make_resolv_conf(){", "    :", "}"]
 
+    for CHUNK in ins:
+        CMD = "echo " + "\"" + CHUNK + "\"" + " >>" + FILE
+        RTN = bash(CMD)[2]
+        if int(RTN) != 0:
+            print "Can't insert to {} please verify manually".format(FILE)
+            sys.exit(1)
 def identifier():
     """
     This function will search for bash function named make_resolv_conf()
@@ -48,8 +58,9 @@ def main_deactivate():
     try:
         numbs = identifier()
     except ValueError:
-        print "Bash Function not defined in dclient hooks"
-        sys.exit(1)
+        print "Bash Function not defined in dclient hooks... Inserting..."
+        inserter()
+        numbs = identifier()
     element = {}
     for line in range(int(numbs[0]), int(numbs[1])):
         command = "cat " + FILE + " | sed -e \"" + str(line) + "!" + "d" + "\""
@@ -69,6 +80,7 @@ def main_deactivate():
             ret = bash(cmd)[2]
             if ret != 0:
                 print "Something went wrong when trying to edit {} on line".format(v)
+                sys.exit(1)
     elif ":" in element.values():
             print "Resolve.conf override function found as disabled "
             sys.exit(0)
@@ -76,10 +88,11 @@ def main_deactivate():
 
 def main_activate():
     try:
-        numbs = identifier()        
+        numbs = identifier()
     except ValueError:
-        print "Bash Function not defined in dhclient hooks"
-        sys.exit(1)
+        print "Bash Function not defined in dhclient hooks ... Inserting the function and activating"
+        inserter()
+        numbs = identifier()
     element = {}
     for line in range(int(numbs[0]), int(numbs[1])):
         command = "cat " + FILE + " | sed -e \"" + str(line) + "!" + "d" + "\""
