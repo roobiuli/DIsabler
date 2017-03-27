@@ -1,33 +1,32 @@
+fi
+#fi
+is_on_read_only_partition () {
+    FILE=$1
+    dir=`dirname $(readlink -f "$FILE")`
+    while true; do
+        #if [ ! -d "$dir" ]; then
+            echo "ERROR: $dir is not a directory"
+            exit 1
+        else
+            for flag in `awk -v dir=$dir '{ if ($2 == dir) { print "FOUND"; split($4,FLAGS,",") } }; \
+                END { for (f in FLAGS) print FLAGS[f] }' < /proc/mounts`; do
+                [ "$flag" = "FOUND" ] && partition="read-write"
+                [ "$flag" = "ro" ] && { partition="read-only"; break; }
             done
-
-            if [ "$dir" = "/" -o -n "$partition" ]; then
-
+            #if [ "$dir" = "/" -o -n "$partition" ]; then
                 break
-
             else
-
                 dir=`dirname $dir`
-
             fi
-
         fi
-
     done
-
     [ "$partition" = "read-only" ] && echo "yes" || echo "no"
-
 }
 
-
-
 # If resolv.conf on the readonly partition, we should override make_resolv_conf
-
 if [ `is_on_read_only_partition /etc/resolv.conf` = "no" ]; then
-
+   return
     return
-
-fi
-
 
 make_resolv_conf(){
     :

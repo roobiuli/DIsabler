@@ -1,9 +1,14 @@
-#!/usr/bin/python
-
+#!/usr/bin/env python
 import sys
 from subprocess import Popen, PIPE
 import re
 import argparse
+
+_author_ = "FC-024 Computer Systems Software Lifecycle" 
+_version_ = "0.1" 
+_date_ = "2017-03-23"
+
+
 PAR = argparse.ArgumentParser(description="This script will activate / deactivate the \
                                                                   make_resolve_conf bash function which is \
                                                                    used by the DHCP Client / usually used \
@@ -58,7 +63,47 @@ def identifier(search):
         spos = int(spos) + 1
     return pos, spos
 
-def act_deact(*ar):
+
+def main_deactivate():
+    """
+    This function will loop on the line numbers of the BASH function found,
+    it will deactivate the function if found active
+    """
+    try:
+        numbs = identifier("is_on_read_only_partition /etc/resolv.")
+    except ValueError:
+        print "Bash Function not defined in dclient hooks... Inserting..."
+        inserter()
+        numbs = identifier("is_on_read_only_partition /etc/resolv.")
+    element = {}
+    for line in range(int(numbs[0]), int(numbs[1])):
+        command = "cat " + FILE + " | sed -e \"" + str(line) + "!" + "d" + "\""
+        element[line] = bash(command)[0]
+    if "#Deactivated by CSRU" in element.values():
+        print "Bash Function already commented out"
+        sys.exit(0)
+    elif "#return" not in element.values() or "#Deactivated by CSRU" not in element.values():
+        print "Deactivating Function"
+        small = min(int(n) for n in element.keys())
+        for k, v  in element.items():
+            if k == int(small):
+                cmd =  "sed -i -e "  + "\'" + str(k) + "s" + "/if \[/" + "#if \[/' " + FILE
+            elif "return" in v:
+                cmd = "sed -i -e" + " \"" + str(k) + "s" + "/.*/    #Deactivated by CSRU/" + \
+                                                                                                         "\"" + " " + FILE
+            else:
+                cmd = "sed -i -e "  + "'" + str(k) + "s" + "/" + str(v) + "/" + "#" + \
+                                                                         str(v) + "/'"  +" " + FILE
+            ret = bash(cmd)[2]
+            if ret != 0:
+                print "Something went wrong when trying to edit {} on line".format(v)
+                sys.exit(1)
+    elif ":" in element.values():
+            print "Resolve.conf override function found as disabled "
+            sys.exit(0)
+
+
+def main_activate():
     try:
         numbs = identifier("is_on_read_only_partition /etc/resolv.")
     except ValueError:
@@ -70,50 +115,27 @@ def act_deact(*ar):
         command = "cat " + FILE + " | sed -e \"" + str(line) + "!" + "d" + "\""
         element[line] = bash(command)[0]
     small = min(int(n) for n in element.keys())
-    for k, v in element.items():
-        if int(len(ar)) == 1:
-        #Setting activation commands( s= shell, s= small, r= replace, o= others, c= command )
-            ssc = "sed -i -e "  + "\'" + str(k) + "s/#//' " + FILE
-            src = "sed -i -e" + " \"" + str(k) + "s" + "/.*/    return/" + "\"" +" "+ FILE
-            soc = "sed -i -e" + " \"" + str(k) + "s" + "/" + str(v) + "/" +\
+    if "#Deactivated by CSRU" in element.values(): #or ":" not in element.values():
+        print "Activating Bash Function"
+        for k, v  in element.items():
+            if k == int(small):
+                cmd =  "sed -i -e "  + "\'" + str(k) + "s/#//' " + FILE
+            elif "#Deactivated by CSRU" in v:
+                cmd = "sed -i -e" + " \"" + str(k) + "s" + "/.*/    return/" + "\"" +" "+ FILE
+            else:
+                cmd = "sed -i -e" + " \"" + str(k) + "s" + "/" + str(v) + "/" +\
                                                          str(v)[1:] + "/" + "\"" +" "+ FILE
-            act = "Activating..."
-        elif int(len(ar)) == 2:
-        #Setting DEactivation commands( s= shell, s= small, r= replace, o= others, c= command )
-            ssc = "sed -i -e "  + "\'" + str(k) + "s" + "/if \[/" + "#if \[/' " + FILE
-            src = "sed -i -e" + " \"" + str(k) + "s" + "/.*/    #Deactivated by CSRU/" + \
-                                                                                                         "\"" + " " + FILE
-            soc = cmd = "sed -i -e "  + "'" + str(k) + "s" + "/" + str(v) + "/" + "#" + \
-                                                                         str(v) + "/'"  +" " + FILE
-            act = "Deactivating..."
-    all = [small, ssc, src, soc, act]
-    return all
-
-
-def main(*ar):
-    if args.A is True:
-      holder = act_deact("-")
-    elif args.D is True:
-      holder = act_deact("-", "-")
-    print holder[4]
-    for k, v  in element.items():
-        if k == int(holder[0]):
-            cmd =  holder[1]
-
-            #### COntinue FORM HERE (HOME)
-            print "executin {}".format(cmd)
-        elif "#Deactivated by CSRU" in v or "return" in v:
-            cmd = src
-            print "executin {}".format(cmd)
-        else:
-            cmd = soc
-            print "executin {}".format(cmd)
-        ret = bash(cmd)[2]
-        if ret != 0:
-            print "Something went wrong when trying to edit {} on line".format(v)
-            sys.exit(1)
-    #else:
-     #   print "Function already active"
-      #  sys.exit(0)
+            ret = bash(cmd)[2]
+            if ret != 0:
+                print "Something went wrong when trying to edit {} on line".format(v)
+                sys.exit(1)
+    else:
+        print "Function already active"
+        sys.exit(0)
 if __name__ == "__main__":
-    main()
+    if args.A is True:
+        main_activate()
+    elif args.D is True:
+        main_deactivate()
+    else:
+        print "Please use --help, switches are required"
