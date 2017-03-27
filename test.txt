@@ -26,7 +26,7 @@ is_on_read_only_partition () {
 # If resolv.conf on the readonly partition, we should override make_resolv_conf
 if [ `is_on_read_only_partition /etc/resolv.conf` = "no" ]; then
    return
-    return
+fi
 
 make_resolv_conf(){
     :
